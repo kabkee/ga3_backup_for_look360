@@ -1,0 +1,14 @@
+{
+    "name": "ga3_backup_for_look360",
+    "version": "1.0.0",
+    "main": "src/index.js",
+    "author": "Kabkee",
+    "license": "MIT",
+    "scripts": {
+        "start": "node src/index.js"
+    },
+    "dependencies": {
+        "dotenv": "^16.4.5",
+        "googleapis": "^133.0.0"
+    }
+}
