@@ -1,4 +1,5 @@
 const { google } = require("googleapis");
+const { insertRows } = require("./plugins/mongoDb.js");
 
 /*
     1번의 Query로 최대 1000개 Row가 회신 되기 때문에 전체 데이터가 1000개를 초과하는 경우
@@ -77,21 +78,29 @@ let totalPage;
 
 // Async 형으로 모든 데이터를 수집하기 위해서 nextLink 여부에 따라 다 회수의 Query를 요청하는 함수
 const fetchStart = async (options) => {
+    let columnHeaderOnly;
+
 	do {
 
         // 현황을 확인하기 위한 log
+        let logStatement = `** trying ${tryCount}`
 		if (totalPage) {
-			console.info(`** trying ${tryCount} of ${totalPage} queries. **`);
-		} else {
-			console.info(`** trying ${tryCount} try query. **`);
-		}
-
+			logStatement += `of ${totalPage}`;
+        }
+        logStatement += `queries.`;
+		if (totalResult) {
+			logStatement += ` / ${totalResult}`;
+        }
+        logStatement += ` **`;
+        console.info(logStatement);
+        
         // Query 결과문 원 데이터 담기
 		result = await fetchData(options);
 
         // Query 처음 요청 시, 비어있는 전체 데이터 수를 저장
 		if (!totalResult) {
 			totalResult = result.data.totalResults;
+            console.info(`this Query Total results is "${totalResult}"`)
 		}
         // Query 처음 요청 시, 비어있는 페이지 수를 저장
 		if (!totalPage) {
@@ -102,17 +111,29 @@ const fetchStart = async (options) => {
 		}
 
 		results = [...results, ...result.data.rows];
+        columnHeaderOnly = getOnlyColumnHeaders(result.data.columnHeaders)
+
+        console.info(`** Start inserting... "${options.collectionName}" **`);
+        await insertRows({
+            result: {
+                data: [...result.data.rows]
+            },
+            collectionName: options.collectionName,
+            columnHeaders: columnHeaderOnly
+        });
+        console.info(`** Done inserting... "${options.collectionName}", startIndex: **`, startIndex);
+    
 
         // Query 요청 회수 업데이트 (+1)
 		tryCount += 1;
 	} while (hasNextLink);
 
     // Query 전체를 확인하기 위한 log
-	console.info({
-		tryCount: results.length,
-		data: results,
-		columnHeaders: getOnlyColumnHeaders(result.data.columnHeaders),
-	});
+	// console.info({
+	// 	tryCount: results.length,
+	// 	data: results,
+	// 	columnHeaders: columnHeaderOnly,
+	// });
 
 	return {
 		tryCount: results.length,
@@ -125,14 +146,42 @@ const fetchStart = async (options) => {
 // 다른 조건의 여러 개의 Query를 생성할 수 있도록 만든 Async 함수
 const fetches = async () => {
 	// 국가별 사용자 & 페이지뷰
-	console.info('** Start fetching... "PAGEVIEWS_BY_COUNTRY" **');
+    // let collectionName = "PAGEVIEWS_BY_COUNTRY";
+	// console.info(`** Start fetching... "${collectionName}" **`);
+	// const countryResult = await fetchStart({
+    //     collectionName,
+	// 	dimensions: process.env.QUERY_DEFAULT_DIMENSIONS + ",ga:country",
+	// 	metrics: process.env.QUERY_DEFAULT_METRICS,
+	// 	startDate: process.env.QUERY_DEFAULT_START_DATE,
+	// 	endDate: process.env.QUERY_DEFAULT_END_DATE,
+	// });
+
+
+    // 기기 종류별 사용자 & 페이지뷰
+    // let collectionName = "PAGEVIEWS_BY_DEVICE_CATEGORY";
+	// console.info(`** Start fetching... "${collectionName}" **`);
+	// const countryResult = await fetchStart({
+    //     collectionName,
+	// 	dimensions: process.env.QUERY_DEFAULT_DIMENSIONS + ",ga:deviceCategory",
+	// 	metrics: process.env.QUERY_DEFAULT_METRICS,
+	// 	startDate: process.env.QUERY_DEFAULT_START_DATE,
+	// 	endDate: process.env.QUERY_DEFAULT_END_DATE,
+	// });
+    
+    
+    
+    // 채널 그룹별 사용자 & 페이지뷰
+    let collectionName = "PAGEVIEWS_BY_CHANNEL_GROUPING";
+	console.info(`** Start fetching... "${collectionName}" **`);
 	const countryResult = await fetchStart({
-		dimensions: process.env.QUERY_DEFAULT_DIMENSIONS + ",ga:country",
+        collectionName,
+		dimensions: process.env.QUERY_DEFAULT_DIMENSIONS + ",ga:channelGrouping",
 		metrics: process.env.QUERY_DEFAULT_METRICS,
 		startDate: process.env.QUERY_DEFAULT_START_DATE,
 		endDate: process.env.QUERY_DEFAULT_END_DATE,
 	});
 
-	console.info("countryResult", countryResult);
+
+    return 'Query Done.'
 };
 fetches();
